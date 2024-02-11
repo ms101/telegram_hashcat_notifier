@@ -1,0 +1,34 @@
+#!/usr/bin/expect --
+
+set waittime 600
+set bot_token CHANGEME
+set chat_id CHANGEME
+
+spawn [exec which hashcat] {*}$argv
+
+expect -ex {[s]tatus} {
+        while true {
+                send -- "s"
+
+                expect -re {Recovered\.\.\.\.\.\.\.\.: (.*)Rejected} {
+                        set outp $expect_out(1,string)
+                        set outp [regsub -- "Progress.........:" $outp "Progress:"]
+                        set outp [regsub -all -- " " $outp "%20"]
+                        set outp [regsub -all -- "\r\n" $outp "%0A"]
+
+                        try {
+                                set title HASHCRACKER
+                                set results [exec curl -s -X POST "https://api.telegram.org/bot$bot_token/sendMessage?parse_mode=html&chat_id=$chat_id&text=<b>$title</b>%0A<code>Cracked:%20$outp</code>"]
+                                set status 0
+                        } trap CHILDSTATUS {results options} {
+                                set status [lindex [dict get $options -errorcode] 2]
+
+                                if {$status != 0} {
+                                        send_user "\n[!] cURL error: $status"
+                                }
+                        }
+                }
+
+                sleep $waittime
+        }
+}
